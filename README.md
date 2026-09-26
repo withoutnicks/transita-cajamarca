@@ -1,116 +1,115 @@
 # Asistente de Rutas de Cajamarca
 
-Aplicación local con FastAPI, SQLite, frontend React y Gemini API. Las consultas frecuentes se interpretan con reglas deterministas y Gemini se usa para clasificar frases no reconocidas y generar respuestas naturales.
+Una herramienta para consultar rutas de transporte publico en Cajamarca, Peru.
 
-El frontend está construido con React 18 + Vite y se sirve desde FastAPI usando el build generado en `frontend/dist`.
-
-## Funciones actuales
-
-- Búsqueda de rutas directas entre dos referencias.
-- Tolerancia a alias, tildes, abreviaturas y errores comunes.
-- Listado de todas las rutas y sentidos que pasan por un lugar.
-- Información descriptiva de lugares turísticos, educativos, religiosos, de salud y comerciales.
-- Establecimientos cercanos (bancos, restaurantes, farmacias) por lugar de referencia.
-- Horarios, frecuencias, tarifas y salida teórica por ruta.
-- Familias de ruta: `ruta 03` devuelve `R-03-1` y `R-03-2`.
-- Clasificación de intención vía Gemini (con parser determinista de fallback).
-- Respuestas naturales verificadas generadas por Gemini a partir de datos SQL.
-- Sugerencias ante consultas vagas (deterministas).
-- Manejo de "fuera de alcance" para consultas no relacionadas.
-- Contexto conversacional (4-5 turnos).
-- Lista de candidatos cuando un lugar es ambiguo.
-- Funcionamiento principal aunque Gemini no esté configurado.
-
-SQLite es la única fuente de rutas y datos operativos. IDA y VUELTA se procesan como recorridos independientes. Solo se buscan rutas directas; no hay transbordos todavía.
-
-## Requisitos
-
-- Python 3.12 recomendado.
-- SQLite (archivo local `transita_cajamarca.db`).
-- Gemini API key (gratuita para desarrollo en Google AI Studio).
-
-## Configuración
-
-Desde PowerShell, en la raíz del proyecto:
-
-```powershell
-cd "<carpeta-del-proyecto>"
+```
+backend/     API FastAPI
+frontend/    Interfaz React + Vite
+database/    Datos en SQLite (rutas, puntos, aliases)
 ```
 
-Si el entorno virtual aún no existe:
+## Que permite hacer
 
-```powershell
-py -3.12 -m venv .venv
-& ".venv\Scripts\python.exe" -m pip install -r requirements.txt
+- Buscar rutas directas entre dos referencias.
+- Ver que rutas pasan por un lugar.
+- Conocer horarios, frecuencias y tarifas.
+- Explorar información de lugares turisticos, comerciales y de salud.
+- Resolver nombres ambiguos con sugerencias.
+- Funciona sin clave de API.
+
+## Tecnologias
+
+- **Backend**: FastAPI + SQLite + Uvicorn
+- **Frontend**: React 18 + TypeScript + Vite
+- **Clasificacion**: Parser determinista + Gemini (opcional)
+- **Datos**: SQLite local, solo datos de consulta
+
+## Inicio rapido
+
+```bash
+# Backend
+python -m backend.init_db --reset
+python -m backend.main
+
+# Frontend
+cd frontend && npm install && npm run build
 ```
 
-Copia `.env.example` como `.env` y añade tu clave:
+Abrir `http://127.0.0.1:8000`.
+
+## Configuracion
+
+Variables de entorno en `.env`:
 
 ```dotenv
 DB_PATH=transita_cajamarca.db
 GEMINI_API_KEY=tu_clave_aqui
 GEMINI_MODEL=gemini-3.5-flash-lite
-GEMINI_TIMEOUT_SECONDS=8
 ```
 
-## Base de datos
+Gemini es opcional. Sin la clave, el sistema sigue funcionando con el parser determinista.
 
-Inicializar y cargar datos (crea la base si no existe):
+## Comandos utiles
 
-```powershell
+```bash
+# Inicializar base de datos
 python -m backend.init_db
+
+# Reinicializar (borra y recrea)
 python -m backend.init_db --reset
+
+# Tests (no requieren Gemini)
+python -m unittest discover -s tests -v
+
+# Build del frontend
+cd frontend && npm install && npm run build
 ```
 
-Carga en orden: `database/00_schema.sql`, `01_seed.sql`, `02_info_lugares.sql`, `03_establecimientos_cercanos.sql`.
-El flag `--reset` elimina el archivo de DB antes de cargar.
+## Endpoints
 
-## Iniciar la aplicación
-
-Si modificaste el frontend o no existe `frontend/dist`, genera el build:
-
-```powershell
-cd frontend
-npm install
-npm run build
-cd ..
+```
+GET  /                    Interfaz
+GET  /api/health          Estado y conteos
+POST /api/consultar       Consulta principal
+GET  /api/rutas           Listado de rutas
+POST /api/proxima-unidad  Proxima salida
 ```
 
-Luego inicia FastAPI:
+## Estado actual y limites
 
-```powershell
-& ".venv\Scripts\python.exe" -m backend.main
-```
+- Solo rutas directas. Sin transbordos.
+- Tiempos y distancias son del recorrido completo, no del tramo consultado.
+- Proxima salida es teorica desde el inicio de la ruta.
+- Puntos del itinerario son referencias viales, no paraderos certificados.
+- Los datos dependen de lo cargado en la base SQLite.
 
-Abrir `http://127.0.0.1:8000`.
+## Continuar desde aqui
 
-Para detenerla, presiona `Ctrl+C` en la misma terminal. Después de modificar Python, reinicia el servidor si no lo ejecutaste con recarga automática.
+### Prioridad alta
 
-Modo de desarrollo:
+- Confirmar y mejorar la calidad de los datos de rutas.
+- Mantener un despliegue reproducible en Railway.
+- Agregar tests al proceso de merge automatizado.
+- Evaluar persistencia adecuada para SQLite o migrar a PostgreSQL si hay datos dinamicos.
 
-```powershell
-& ".venv\Scripts\python.exe" -m uvicorn backend.main:app --reload --port 8000
-```
+### Producto
 
-## Verificación
+- Rutas con transbordos.
+- Buscar tramos especificos en lugar del recorrido completo.
+- Diferenciar paraderos confirmados de referencias viales.
+- Mejorar la resolucion de lugares ambiguos.
+- Ampliar cobertura de horarios y frecuencia real.
 
-Estado general:
+### Frontend
 
-```text
-http://127.0.0.1:8000/api/health
-```
+- Estados de carga, errores y respuestas lentas.
+- Navegacion mobile y accesibilidad.
+- Optimizar carga inicial.
+- Mapas solo si existe informacion geografica confiable.
 
-Pruebas automatizadas:
+### IA
 
-```powershell
-& ".venv\Scripts\python.exe" -m unittest discover -s tests -v
-```
-
-Las pruebas no requieren Gemini activo.
-
-## Interpretación de datos
-
-- `tiempo_total_ruta_min` y `distancia_total_ruta_km` corresponden al recorrido completo del sentido, no al segmento solicitado.
-- La próxima salida es teórica y se calcula desde el inicio de la ruta según horario y frecuencia.
-- Los puntos del itinerario no se presentan como paraderos confirmados.
-- Si hay varias rutas o variantes válidas, se muestran todas.
+- Medir cuando Gemini realmente mejora el resultado.
+- Reducir llamadas externas innecesarias.
+- Controlar latencia y costos de API.
+- Mantener el parser determinista como base verificable.
